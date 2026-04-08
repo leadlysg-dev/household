@@ -116,6 +116,37 @@ exports.handler = async (event) => {
       }
     }
 
+    // Read Loan tab if it exists
+    let loanEntries = [];
+    if (allSheets.includes('Loan')) {
+      try {
+        const loanData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SHEET_ID,
+          range: "'Loan'!A1:F200",
+        });
+        const loanRows = loanData.data.values || [];
+        for (let i = 1; i < loanRows.length; i++) {
+          const row = loanRows[i];
+          const item = (row[1] || '').toString().trim();
+          const amountRaw = (row[2] || '').toString().replace(/[$,]/g, '');
+          const amount = parseFloat(amountRaw);
+          if (!item || isNaN(amount) || amount <= 0) continue;
+          loanEntries.push({
+            id: i,
+            date: (row[0] || '').toString().trim(),
+            item,
+            amount: Math.round(amount * 100) / 100,
+            type: (row[3] || '').toString().trim() || 'Loan',
+            status: (row[4] || '').toString().trim() || 'Unpaid',
+            notes: (row[5] || '').toString().trim(),
+            row: i + 1,
+          });
+        }
+      } catch (e) {
+        // Loan tab read error — continue
+      }
+    }
+
     // Read settlements tab if it exists
     let settlements = [];
     if (allSheets.includes('Settlements')) {
@@ -145,6 +176,7 @@ exports.handler = async (event) => {
       transactions: allTransactions,
       monthly_meta: monthlyMeta,
       settlements,
+      loan_entries: loanEntries,
       tabs: monthlyTabs,
       total: allTransactions.length,
     });
